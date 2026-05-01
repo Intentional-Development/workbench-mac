@@ -11,12 +11,19 @@ import UniformTypeIdentifiers
 
 @MainActor
 final class GraphViewerModel: ObservableObject {
+    enum DisplayMode: String, CaseIterable, Identifiable {
+        case canvas, list
+        var id: String { rawValue }
+        var label: String { self == .canvas ? "Canvas" : "List" }
+    }
+
     @Published var folderURL: URL?
     @Published var graphFiles: [URL] = []
     @Published var currentFileURL: URL?
     @Published var graph: Graph?
     @Published var loadError: String?
     @Published var selectedNodeID: String?
+    @Published var displayMode: DisplayMode = .canvas
 
     // Filters
     @Published var hiddenKinds: Set<String> = []     // by NodeKind.rawValue
@@ -276,36 +283,46 @@ private struct GraphCenter: View {
             } else if model.graph == nil {
                 ContentUnavailable
             } else {
-                List(selection: Binding(
-                    get: { model.selectedNodeID },
-                    set: { model.selectedNodeID = $0 }
-                )) {
-                    ForEach(model.nodesByKind, id: \.0.rawValue) { (kind, nodes) in
-                        Section("\(kind.rawValue) (\(nodes.count))") {
-                            ForEach(nodes) { n in
-                                NodeRow(node: n)
-                                    .tag(Optional(n.id))
-                            }
-                        }
-                    }
+                switch model.displayMode {
+                case .canvas:
+                    GraphCanvasView(model: model)
+                case .list:
+                    listBody
+                }
+            }
+        }
+    }
 
-                    if let sel = model.selectedNode {
-                        Section("Edges from \(sel.id)") {
-                            if model.edgesFromSelected.isEmpty {
-                                Text("(none)").font(.caption).foregroundStyle(.secondary)
-                            }
-                            ForEach(model.edgesFromSelected, id: \.stableID) { e in
-                                EdgeRow(edge: e, fromSelected: true)
-                            }
-                        }
-                        Section("Edges to \(sel.id)") {
-                            if model.edgesToSelected.isEmpty {
-                                Text("(none)").font(.caption).foregroundStyle(.secondary)
-                            }
-                            ForEach(model.edgesToSelected, id: \.stableID) { e in
-                                EdgeRow(edge: e, fromSelected: false)
-                            }
-                        }
+    @ViewBuilder
+    private var listBody: some View {
+        List(selection: Binding(
+            get: { model.selectedNodeID },
+            set: { model.selectedNodeID = $0 }
+        )) {
+            ForEach(model.nodesByKind, id: \.0.rawValue) { (kind, nodes) in
+                Section("\(kind.rawValue) (\(nodes.count))") {
+                    ForEach(nodes) { n in
+                        NodeRow(node: n)
+                            .tag(Optional(n.id))
+                    }
+                }
+            }
+
+            if let sel = model.selectedNode {
+                Section("Edges from \(sel.id)") {
+                    if model.edgesFromSelected.isEmpty {
+                        Text("(none)").font(.caption).foregroundStyle(.secondary)
+                    }
+                    ForEach(model.edgesFromSelected, id: \.stableID) { e in
+                        EdgeRow(edge: e, fromSelected: true)
+                    }
+                }
+                Section("Edges to \(sel.id)") {
+                    if model.edgesToSelected.isEmpty {
+                        Text("(none)").font(.caption).foregroundStyle(.secondary)
+                    }
+                    ForEach(model.edgesToSelected, id: \.stableID) { e in
+                        EdgeRow(edge: e, fromSelected: false)
                     }
                 }
             }
@@ -326,6 +343,13 @@ private struct GraphCenter: View {
                 }
             }
             Spacer()
+            Picker("", selection: $model.displayMode) {
+                ForEach(GraphViewerModel.DisplayMode.allCases) { m in
+                    Text(m.label).tag(m)
+                }
+            }
+            .pickerStyle(.segmented)
+            .frame(width: 160)
             if let g = model.graph {
                 Text("\(g.nodes.count) nodes · \(g.edges.count) edges")
                     .font(.caption.monospacedDigit())
