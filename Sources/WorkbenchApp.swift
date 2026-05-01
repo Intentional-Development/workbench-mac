@@ -47,6 +47,12 @@ struct ContentView: View {
                     Label("Graph", systemImage: "point.3.connected.trianglepath.dotted")
                 }
                 .tag(4)
+
+            DriftDashboardView()
+                .tabItem {
+                    Label("Drift Dashboard", systemImage: "waveform.badge.magnifyingglass")
+                }
+                .tag(5)
         }
         .padding()
     }
