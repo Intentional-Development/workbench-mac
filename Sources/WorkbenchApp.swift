@@ -41,6 +41,12 @@ struct ContentView: View {
                     Label("Drift", systemImage: "chart.bar.xaxis")
                 }
                 .tag(3)
+
+            GraphViewerView()
+                .tabItem {
+                    Label("Graph", systemImage: "point.3.connected.trianglepath.dotted")
+                }
+                .tag(4)
         }
         .padding()
     }
