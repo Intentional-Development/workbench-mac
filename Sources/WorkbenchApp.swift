@@ -59,6 +59,18 @@ struct ContentView: View {
                     Label("Behavior", systemImage: "list.bullet.rectangle")
                 }
                 .tag(6)
+            
+            DerivedPromptsView()
+                .tabItem {
+                    Label("Prompts", systemImage: "text.bubble")
+                }
+                .tag(7)
+            
+            ProposalReviewView()
+                .tabItem {
+                    Label("Proposals", systemImage: "doc.on.doc")
+                }
+                .tag(8)
         }
         .padding()
     }

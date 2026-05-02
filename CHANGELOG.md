@@ -22,6 +22,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - (Placeholder for in-progress work)
 
+## [v0.9.9-rc.3] - 2026-05-02
+
+### Added (W24 — Derived Prompts + Proposal Review + MCP Mutations)
+- **MCP Mutation Wiring (Complete)**: Full JSON-RPC 2.0 request/response over stdio in MCPClient.swift with error handling and retry on EPIPE/timeout. All 10 tools wired: parseIDL, validateIDL, listProposals, getProposal, createProposal, acceptProposal, rejectProposal, plus 5 read-only tools (read_file, list_files, get_node, list_nodes, query_graph).
+- **Derived Prompts Panel**: New DerivedPromptsView tab with target dropdown (cursor/copilot/claude), generates IDE-specific prompts via `idl prompts` bridge (shells out to workbench-cli or idl-rs binary; MCP FFI deferred to W25), copy-to-clipboard with NSPasteboard format preservation.
+- **Proposal Review UI**: New ProposalReviewView tab with three status sections (Pending/Accepted/Rejected), inline before/after diff visualization, Accept/Reject action buttons with optimistic UI + rollback on failure, audit trail with source attribution (mcp/cli/null), full CRUD via MCP mutations.
+- **ProposalModel.swift**: Complete data model for proposals (ProposalStatus, ProposalOperationType, ProposalSource, ProposalChange, AuditTrailEntry, Proposal), AnyCodable helper for JSON interop, Hashable conformance for SwiftUI List selection.
+- **Tests**: 11 new tests (3 DerivedPromptsTests + 8 ProposalModelTests), total 33 tests passing (6 behavior + 3 prompts + 10 drift + 6 graph + 8 proposal).
+
+### Changed
+- **MCPClient.swift**: Replaced stub `callTool` with real JSON-RPC implementation (requestId tracking, timeout handling, error parsing). Added async/await Swift API surface for all tools.
+- **WorkbenchApp.swift**: Added two new tabs (Prompts, Proposals) to TabView, now 9 tabs total.
+
+### Notes
+- `idl prompts` currently bridges to workbench-cli or idl-rs binary (shell-out). W25 will replace with native Rust FFI.
+- MCP mutations tested with stub data; requires idl-mcp-server running for production use.
+
 ## [v0.9.9-rc.2] - 2026-05-15
 
 ### Added (W23 Catchup Pass)

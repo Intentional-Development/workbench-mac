@@ -163,7 +163,7 @@ public final class MCPClient: ObservableObject {
     // MARK: - Tool Discovery
     
     private func loadToolList() async {
-        // Stub: populate with known W21 tools
+        // Stub: populate with known W21+W24 tools
         // Real implementation would send MCP list_tools request
         
         var tools: [MCPTool] = []
@@ -190,46 +190,130 @@ public final class MCPClient: ObservableObject {
             description: "Query the semantic graph with filters"
         ))
         
+        // Parse/Validate tools
+        tools.append(MCPTool(
+            name: "idl.parse",
+            description: "Parse an IDL file and return AST"
+        ))
+        tools.append(MCPTool(
+            name: "idl.validate",
+            description: "Validate an IDL file for correctness"
+        ))
+        
         // Proposal tools (W24 mutations)
         tools.append(MCPTool(
-            name: "idl.proposal.add_node",
-            description: "Propose adding a new node to the graph"
+            name: "idl.proposal.list",
+            description: "List all proposals (optionally filter by status)"
         ))
         tools.append(MCPTool(
-            name: "idl.proposal.update_node",
-            description: "Propose updating an existing node"
+            name: "idl.proposal.get",
+            description: "Get a specific proposal by ID"
         ))
         tools.append(MCPTool(
-            name: "idl.proposal.remove_node",
-            description: "Propose removing a node from the graph"
+            name: "idl.proposal.create",
+            description: "Create a new proposal (add/update/remove node or edge)"
         ))
         tools.append(MCPTool(
-            name: "idl.proposal.add_edge",
-            description: "Propose adding a new edge between nodes"
+            name: "idl.proposal.accept",
+            description: "Accept a pending proposal"
         ))
         tools.append(MCPTool(
-            name: "idl.proposal.remove_edge",
-            description: "Propose removing an edge from the graph"
+            name: "idl.proposal.reject",
+            description: "Reject a pending proposal with reason"
         ))
         
         self.availableTools = tools
     }
     
-    // MARK: - Tool Invocation (Stub)
+    // MARK: - Tool Invocation (W24 — Real JSON-RPC)
+    
+    private var requestId = 0
     
     public func callTool(name: String, arguments: [String: Any]) async throws -> [String: Any] {
         guard isConnected else {
             throw MCPError.spawnFailed("Not connected to MCP server")
         }
         
-        // Stub: real implementation would send JSON-RPC 2.0 request over stdin/stdout
-        // For W23, just return placeholder
+        guard let stdin = stdinPipe, let stdout = stdoutPipe else {
+            throw MCPError.spawnFailed("Pipes not initialized")
+        }
         
-        return [
-            "tool": name,
-            "status": "stub",
-            "message": "MCP tool invocation scaffold — full implementation in W24"
+        requestId += 1
+        let id = requestId
+        
+        // Build JSON-RPC 2.0 request
+        let request: [String: Any] = [
+            "jsonrpc": "2.0",
+            "id": id,
+            "method": "tools/call",
+            "params": [
+                "name": name,
+                "arguments": arguments
+            ]
         ]
+        
+        // Serialize and send (with retry on EPIPE)
+        do {
+            let data = try JSONSerialization.data(withJSONObject: request)
+            var line = String(data: data, encoding: .utf8) ?? ""
+            line += "\n"
+            
+            if let lineData = line.data(using: .utf8) {
+                try stdin.fileHandleForWriting.write(contentsOf: lineData)
+            }
+        } catch {
+            // Retry once on transient EPIPE/timeout
+            try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+            let data = try JSONSerialization.data(withJSONObject: request)
+            var line = String(data: data, encoding: .utf8) ?? ""
+            line += "\n"
+            if let lineData = line.data(using: .utf8) {
+                try stdin.fileHandleForWriting.write(contentsOf: lineData)
+            }
+        }
+        
+        // Read response (with timeout)
+        let responseData = try await withTimeout(seconds: 30) {
+            return stdout.fileHandleForReading.availableData
+        }
+        
+        guard !responseData.isEmpty else {
+            throw MCPError.invalidResponse("Empty response from MCP server")
+        }
+        
+        // Parse JSON-RPC response
+        let response = try JSONSerialization.jsonObject(with: responseData) as? [String: Any]
+        guard let response = response else {
+            throw MCPError.invalidResponse("Response is not JSON object")
+        }
+        
+        // Check for error
+        if let error = response["error"] as? [String: Any] {
+            let message = error["message"] as? String ?? "Unknown error"
+            throw MCPError.invalidResponse("MCP error: \(message)")
+        }
+        
+        // Extract result
+        guard let result = response["result"] as? [String: Any] else {
+            throw MCPError.invalidResponse("Response missing 'result' field")
+        }
+        
+        return result
+    }
+    
+    private func withTimeout<T>(seconds: Double, operation: @escaping () throws -> T) async throws -> T {
+        let task = Task {
+            try operation()
+        }
+        
+        let timeoutTask = Task {
+            try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+            task.cancel()
+        }
+        
+        let result = try await task.value
+        timeoutTask.cancel()
+        return result
     }
     
     // MARK: - Read Tools (Stubs)
@@ -257,9 +341,56 @@ public final class MCPClient: ObservableObject {
         try await callTool(name: "idl.query_graph", arguments: ["filter": filter])
     }
     
-    // MARK: - Proposal Tools (W24 — read-only listing for now)
+    // MARK: - Proposal Tools (W24 — Full Mutation Support)
     
     public var proposalTools: [MCPTool] {
         availableTools.filter { $0.name.hasPrefix("idl.proposal.") }
+    }
+    
+    // List all proposals
+    public func listProposals(status: String? = nil) async throws -> [[String: Any]] {
+        var args: [String: Any] = [:]
+        if let status = status {
+            args["status"] = status
+        }
+        let result = try await callTool(name: "idl.proposal.list", arguments: args)
+        return result["proposals"] as? [[String: Any]] ?? []
+    }
+    
+    // Get a specific proposal
+    public func getProposal(id: String) async throws -> [String: Any] {
+        try await callTool(name: "idl.proposal.get", arguments: ["id": id])
+    }
+    
+    // Create a new proposal
+    public func createProposal(type: String, data: [String: Any], reason: String) async throws -> [String: Any] {
+        try await callTool(name: "idl.proposal.create", arguments: [
+            "type": type,
+            "data": data,
+            "reason": reason
+        ])
+    }
+    
+    // Accept a proposal
+    public func acceptProposal(id: String) async throws -> [String: Any] {
+        try await callTool(name: "idl.proposal.accept", arguments: ["id": id])
+    }
+    
+    // Reject a proposal
+    public func rejectProposal(id: String, reason: String) async throws -> [String: Any] {
+        try await callTool(name: "idl.proposal.reject", arguments: [
+            "id": id,
+            "reason": reason
+        ])
+    }
+    
+    // Parse an IDL file
+    public func parseIDL(path: String) async throws -> [String: Any] {
+        try await callTool(name: "idl.parse", arguments: ["path": path])
+    }
+    
+    // Validate an IDL file
+    public func validateIDL(path: String) async throws -> [String: Any] {
+        try await callTool(name: "idl.validate", arguments: ["path": path])
     }
 }
