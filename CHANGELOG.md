@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - (Placeholder for in-progress work)
 
+## [0.9.2] - 2026-05-02
+
+### Changed
+- Version alignment with IDL v0.9.2 (no functional changes)
+- Schema compatibility: validated against v0.1.5
+
 ## [0.9.1] - 2026-05-02
 
 ### Changed
