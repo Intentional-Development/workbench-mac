@@ -10,9 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - (Placeholder for in-progress work)
 
-## [0.10.0] - 2026-05-02
+## [0.9.0] - 2026-05-02
 
-### Added
+### Added (Waves 10-13 Cumulative)
+- Wave 13: Canonical-DTO gap closure across 4 corpora (n8n 93.8%, firefly-iii 76.2%, localsend 66.7% schema strict conformance)
 - Wave 11: Drift Dashboard tab (Sources/Models, Services, Views) with alignment status visualization
 - Wave 11: Drift Dashboard unit tests (swift test green)
 - Wave 9: Graph canvas with force-directed layout (Wave 9)
