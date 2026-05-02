@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - (Placeholder for in-progress work)
 
+## [0.9.1] - 2026-05-02
+
+### Changed
+- Version alignment with IDL ecosystem (no functional changes this wave)
+
 ## [0.9.0] - 2026-05-02
 
 ### Added (Waves 10-13 Cumulative)
