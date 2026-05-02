@@ -253,6 +253,7 @@ public struct Confidence: Codable, Hashable {
     public let model: String?
     public let run_id: String?
     public let rationale: String?
+    public let metadata: [String: JSONValue]?  // v0.1.9: behavior classification
 }
 
 // MARK: Node / Edge / Graph
@@ -276,6 +277,11 @@ public struct GraphNode: Codable, Identifiable, Hashable {
         if let s = props?["statement"]?.stringValue { return s }
         if let s = props?["title"]?.stringValue { return s }
         return id
+    }
+    
+    /// Short label for nodes — uses props.name
+    public var name: String {
+        displayLabel
     }
 }
 

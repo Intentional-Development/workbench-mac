@@ -53,6 +53,12 @@ struct ContentView: View {
                     Label("Drift Dashboard", systemImage: "waveform.badge.magnifyingglass")
                 }
                 .tag(5)
+            
+            BehaviorView()
+                .tabItem {
+                    Label("Behavior", systemImage: "list.bullet.rectangle")
+                }
+                .tag(6)
         }
         .padding()
     }

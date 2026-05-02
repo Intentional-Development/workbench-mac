@@ -22,6 +22,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - (Placeholder for in-progress work)
 
+## [v0.9.9-rc.2] - 2026-05-15
+
+### Added (W23 Catchup Pass)
+- **Behavior Classification Viewer**: New BehaviorView tab displaying nodes grouped by `confidence.metadata.behavior` (entity/value-object/command/event/query-result/dto-only) with color-coded distribution stats (schema v0.1.9)
+- **MCP Client Scaffold**: MCPClient.swift (stdio transport) for calling W21 idl-mcp-server (5 read tools + 5 proposal mutation tools listed; mutations deferred to W24)
+- **RC Versioning**: Aligned to v0.9.9-rc.1 stack capabilities (paginated kind support, W22 Perspectives/Derived Prompts, W21 MCP server integration)
+
+### Skipped
+- Waves W19, W20, W21, W22 — workbench-mac parked during those waves; now caught up to v0.9.9-rc.1 stack
+
 ## [0.9.3] - 2025-01-03
 
 - **workbench-mac:** version alignment, no functional changes.
