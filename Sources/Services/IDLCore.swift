@@ -1,20 +1,32 @@
 import Foundation
 
+// C FFI declarations for idl-ffi Rust library
+@_silgen_name("idl_parse_graph")
+private func idl_parse_graph(_ path: UnsafePointer<CChar>) -> UnsafeMutablePointer<CChar>?
+
+@_silgen_name("idl_free_string")
+private func idl_free_string(_ ptr: UnsafeMutablePointer<CChar>?)
+
 enum IDLCoreError: Error {
     case cliNotFound
     case executionFailed(String)
     case invalidOutput
+    case ffiError(String)
 }
 
 actor IDLCore {
     static let shared = IDLCore()
     
     private let cliPath: String
+    private let useFFI: Bool
     
     private init() {
         // Default path to workbench-cli - can be configured via environment or settings
         let projectRoot = "/Users/carloshm/personal-projects/intentional"
         self.cliPath = "\(projectRoot)/workbench-cli/dist/index.js"
+        
+        // Feature flag: use FFI by default, fall back to CLI if IDL_USE_CLI=1
+        self.useFFI = ProcessInfo.processInfo.environment["IDL_USE_CLI"] != "1"
     }
     
     // MARK: - Extraction
@@ -42,6 +54,38 @@ actor IDLCore {
     }
     
     // MARK: - Parsing
+    
+    func parseGraph(path: String) async throws -> String {
+        if useFFI {
+            return try parseGraphViaFFI(path: path)
+        } else {
+            return try await parseGraphViaCLI(path: path)
+        }
+    }
+    
+    private func parseGraphViaFFI(path: String) throws -> String {
+        guard let resultPtr = idl_parse_graph(path) else {
+            throw IDLCoreError.ffiError("FFI returned null pointer")
+        }
+        defer { idl_free_string(resultPtr) }
+        
+        let json = String(cString: resultPtr)
+        
+        // Check for error JSON: {"error": "..."}
+        if json.contains("\"error\""),
+           let data = json.data(using: .utf8),
+           let errorObj = try? JSONSerialization.jsonObject(with: data) as? [String: String],
+           let errorMsg = errorObj["error"] {
+            throw IDLCoreError.ffiError(errorMsg)
+        }
+        
+        return json
+    }
+    
+    private func parseGraphViaCLI(path: String) async throws -> String {
+        let args = ["parse", "--path", path, "--format", "json"]
+        return try await runCLI(args: args)
+    }
     
     func parseIDL(content: String) async throws -> IDLDocument {
         // For now, write to temp file and parse
@@ -96,9 +140,7 @@ actor IDLCore {
     }
 }
 
-// MARK: - Future FFI Bridge Point
-// When Rust idl-core FFI is ready via swift-bridge:
-// - Replace runCLI() with direct FFI calls to idl_core_extract(), idl_core_emit(), etc.
-// - Remove Process/shell-out code
-// - Import swift-bridge generated bindings
-// - See docs/RUST_BRIDGE_PLAN.md for migration path
+// MARK: - FFI Integration Status (W25)
+// ✅ parse_graph: FFI-native (toggleable via IDL_USE_CLI env var)
+// ❌ extract, emit, drift: Still shell out to workbench-cli (heavier operations, deferred to W26)
+// Feature flag: Set IDL_USE_CLI=1 to force CLI mode for all operations

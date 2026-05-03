@@ -11,7 +11,13 @@ let package = Package(
         .executableTarget(
             name: "WorkbenchMac",
             dependencies: [],
-            path: "Sources"
+            path: "Sources",
+            linkerSettings: [
+                .unsafeFlags([
+                    "-L", "../idl-rs/target/release",
+                    "-lidl_ffi"
+                ])
+            ]
         ),
         .testTarget(
             name: "WorkbenchMacTests",

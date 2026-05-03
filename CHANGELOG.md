@@ -22,6 +22,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - (Placeholder for in-progress work)
 
+## [v0.9.9-rc.4] - 2026-05-03
+
+### Added (W25 — Rust FFI Integration + OQ2 Resolution)
+- **Rust FFI for `parse_graph`**: Native Rust FFI integration via raw C API (idl-ffi crate). Replaces Node.js shell-out for graph parsing, ~100x faster startup time (<1ms vs ~800ms). Decision: Raw C FFI chosen over swift-bridge (see IDL/docs/workbench-mac-ffi-decision.md).
+- **Feature Flag for CLI Fallback**: `IDL_USE_CLI=1` environment variable toggles between FFI and CLI bridge. Enables graceful fallback if FFI build fails on CI or for debugging.
+- **FFI Integration Tests**: 3 new tests in IDLCoreFFITests.swift (nonexistent path, valid path, fallback toggle). Total: 36 tests passing (33 existing + 3 FFI).
+- **Updated Package.swift**: Added linker settings for `libidl_ffi.a` (17MB static lib from idl-rs/target/release).
+- **Updated README.md**: Documented Rust FFI build steps, prerequisites (Rust 1.70+), CLI fallback mode, and FFI vs CLI operation matrix.
+
+### Changed
+- **IDLCore.swift**: Added FFI wrapper functions (`parseGraphViaFFI`) with manual C string bridging (`@_silgen_name`). Feature flag determines FFI vs CLI mode at runtime.
+- **Architecture Diagram**: Updated README to show FFI path alongside CLI bridge (idl-ffi + workbench-cli dual-mode).
+
+### Technical Details
+- **FFI Surface**: 4 functions exposed (parse_graph, validate_graph, classify_behavior, free_string). Only `parse_graph` wired in W25; others deferred to W26.
+- **Error Propagation**: FFI returns JSON with `{"error": "..."}` key on failure. Swift parses and re-throws as `IDLCoreError.ffiError`.
+- **Memory Management**: Manual bridging with `defer { idl_free_string(resultPtr) }` to prevent leaks.
+- **Binary Size**: libidl_ffi.a = 17MB (static), libidl_ffi.dylib = 694KB (dynamic).
+- **Build Time**: idl-ffi release build = 2.5s (reuses W24 artifacts).
+
+### OQ2 Resolution
+**Open Question 2 (swift-bridge vs raw C FFI):** RESOLVED — Raw C FFI selected.
+
+**Rationale:**
+1. Already built and tested (11/11 Rust tests pass from W24)
+2. Zero additional dependencies (no swift-bridge crate)
+3. Faster build (2.5s vs 12.6s)
+4. Simpler mental model (explicit C interop, no proc-macro magic)
+5. Only 4 FFI functions exposed → manual bridging boilerplate is trivial (5 LoC per function)
+
+See full spike comparison: `IDL/docs/workbench-mac-ffi-decision.md`
+
+### Notes
+- `extract`, `emit`, `drift` operations still shell out to workbench-cli (heavy operations, W26 for FFI wiring).
+- Swift 5.9+ and Rust 1.70+ required for building.
+- FFI mode is default; set `IDL_USE_CLI=1` to force CLI mode for debugging or if FFI library is unavailable.
+
 ## [v0.9.9-rc.3] - 2026-05-02
 
 ### Added (W24 — Derived Prompts + Proposal Review + MCP Mutations)
